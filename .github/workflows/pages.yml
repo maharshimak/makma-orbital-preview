@@ -1,0 +1,57 @@
+name: Publish isolated MAK'MA Orbital preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orbital-preview-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout preview delivery configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Checkout reviewed Orbital experience snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: maharshimak/makma-ai-os
+          ref: 3bd7f9562a078d7419752ecd727990a3dda6f9c1
+          path: source
+          persist-credentials: false
+      - name: Assemble isolated static preview
+        run: python scripts/assemble.py
+      - name: Validate preview assets
+        run: |
+          test -s public/index.html
+          test -s public/style.css
+          test -s public/app.js
+          test -s public/orbital-3d.js
+          for scene in orbit network datacenter core; do
+            test -s "public/assets/${scene}.png"
+          done
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+        with:
+          path: public
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy preview to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
